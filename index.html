@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>conjur.in - your personal entity awaits</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #0a0a0a;
+            color: #ccc;
+            font-family: 'Courier New', monospace;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 600px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        #loading {
+            font-size: 14px;
+            color: #666;
+            letter-spacing: 2px;
+        }
+        
+        #entity-reveal {
+            display: none;
+            animation: fadeIn 3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        #entity-canvas {
+            width: 300px;
+            height: 300px;
+            margin: 30px auto;
+            border: 1px solid #333;
+            box-shadow: 0 0 30px rgba(255, 0, 0, 0.1);
+            animation: pulse 4s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 30px rgba(255, 0, 0, 0.1); }
+            50% { box-shadow: 0 0 50px rgba(255, 0, 0, 0.3); }
+        }
+        
+        .entity-name {
+            font-family: 'Cinzel', serif;
+            font-size: 36px;
+            color: #fff;
+            margin: 20px 0;
+            letter-spacing: 4px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+        
+        .entity-title {
+            font-size: 16px;
+            color: #888;
+            font-style: italic;
+            margin-bottom: 30px;
+        }
+        
+        .entity-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .stat {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border: 1px solid #222;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            color: #fff;
+            margin-top: 5px;
+        }
+        
+        .binding-instructions {
+            background: rgba(255, 0, 0, 0.05);
+            border: 1px solid #330000;
+            padding: 20px;
+            margin: 30px 0;
+            text-align: left;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+        
+        .binding-title {
+            font-family: 'Cinzel', serif;
+            font-size: 18px;
+            color: #fff;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .binding-step {
+            margin: 10px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .binding-step::before {
+            content: "◈";
+            position: absolute;
+            left: 0;
+            color: #660000;
+        }
+        
+        .abilities {
+            margin: 30px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid #222;
+        }
+        
+        .abilities-title {
+            font-family: 'Cinzel', serif;
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+        
+        .ability {
+            margin: 10px 0;
+            font-size: 14px;
+            color: #aaa;
+        }
+        
+        .share-section {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #333;
+        }
+        
+        .share-url {
+            background: #111;
+            border: 1px solid #333;
+            padding: 10px;
+            margin: 10px 0;
+            word-break: break-all;
+            font-size: 12px;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .share-url:hover {
+            background: #1a1a1a;
+            color: #999;
+        }
+        
+        .warning {
+            margin-top: 30px;
+            font-size: 11px;
+            color: #444;
+            font-style: italic;
+        }
+        
+        .rune {
+            display: inline-block;
+            font-size: 20px;
+            margin: 0 5px;
+            animation: flicker 3s infinite;
+        }
+        
+        @keyframes flicker {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+        
+        #summon-btn {
+            background: none;
+            border: 1px solid #660000;
+            color: #cc0000;
+            padding: 15px 40px;
+            font-family: 'Cinzel', serif;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 40px;
+            letter-spacing: 2px;
+        }
+        
+        #summon-btn:hover {
+            background: rgba(204, 0, 0, 0.1);
+            border-color: #cc0000;
+            box-shadow: 0 0 20px rgba(204, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="loading">
+            <p>reading your essence...</p>
+            <p style="margin-top: 10px;">
+                <span class="rune">☿</span>
+                <span class="rune">☽</span>
+                <span class="rune">☾</span>
+                <span class="rune">☿</span>
+            </p>
+        </div>
+        
+        <div id="entity-reveal">
+            <canvas id="entity-canvas" width="300" height="300"></canvas>
+            
+            <h1 class="entity-name" id="entity-name"></h1>
+            <p class="entity-title" id="entity-title"></p>
+            
+            <div class="entity-stats">
+                <div class="stat">
+                    <div class="stat-label">Potency</div>
+                    <div class="stat-value" id="stat-potency"></div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Volatility</div>
+                    <div class="stat-value" id="stat-volatility"></div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Resonance</div>
+                    <div class="stat-value" id="stat-resonance"></div>
+                </div>
+            </div>
+            
+            <div class="abilities">
+                <div class="abilities-title">Manifestations</div>
+                <div id="abilities-list"></div>
+            </div>
+            
+            <div class="binding-instructions">
+                <div class="binding-title">Binding Protocol</div>
+                <div id="binding-steps"></div>
+            </div>
+            
+            <div class="share-section">
+                <p style="color: #666; margin-bottom: 10px;">Share your entity's summoning seal:</p>
+                <div class="share-url" id="share-url" onclick="copyToClipboard()"></div>
+                <p style="font-size: 12px; color: #444; margin-top: 5px;">click to copy</p>
+            </div>
+            
+            <p class="warning">
+                Warning: Each browser soul may only bind one entity. 
+                Clear your spiritual cache to summon anew.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Generate browser fingerprint
+        async function generateFingerprint() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.textBaseline = 'top';
+            ctx.font = '14px Arial';
+            ctx.fillText('fingerprint', 2, 2);
+            const canvasData = canvas.toDataURL();
+            
+            const fingerprint = {
+                canvas: canvasData,
+                screen: `${screen.width}x${screen.height}x${screen.colorDepth}`,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                language: navigator.language,
+                platform: navigator.platform,
+                cores: navigator.hardwareConcurrency || 0,
+                memory: navigator.deviceMemory || 0,
+                vendor: navigator.vendor,
+                userAgent: navigator.userAgent
+            };
+            
+            // Create hash from fingerprint
+            const str = JSON.stringify(fingerprint);
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            
+            return Math.abs(hash);
+        }
+        
+        // Generate entity based on fingerprint
+        async function generateEntity() {
+            const fingerprint = await generateFingerprint();
+            const seed = fingerprint;
+            
+            // Seeded random number generator
+            let s = seed;
+            const random = () => {
+                s = (s * 16807) % 2147483647;
+                return (s - 1) / 2147483646;
+            };
+            
+            // Generate name
+            const prefixes = ['Zar', 'Mor', 'Vel', 'Kaz', 'Nyx', 'Bel', 'Raz', 'Mal', 'Vor', 'Xal'];
+            const middles = ['\'', 'ath', 'gor', 'thos', 'iel', 'oth', 'esh', 'ul', 'ar', 'ez'];
+            const suffixes = ['oth', 'ian', 'iel', 'esh', 'ul', 'ar', 'on', 'im', 'el', 'ux'];
+            
+            const name = prefixes[Math.floor(random() * prefixes.length)] +
+                        middles[Math.floor(random() * middles.length)] +
+                        suffixes[Math.floor(random() * suffixes.length)];
+            
+            // Generate title
+            const titles = [
+                'The Whisperer in Static',
+                'Keeper of Forgotten Names',
+                'The Threshold Guardian',
+                'Weaver of Digital Shadows',
+                'The Memory Eater',
+                'Herald of Corrupted Data',
+                'The Pattern Breaker',
+                'Collector of Lost Packets',
+                'The Glitch Prophet',
+                'Architect of Broken Links'
+            ];
+            
+            const title = titles[Math.floor(random() * titles.length)];
+            
+            // Generate stats
+            const potency = Math.floor(random() * 900) + 100;
+            const volatility = Math.floor(random() * 100);
+            const resonance = Math.floor(random() * 1000);
+            
+            // Generate abilities
+            const allAbilities = [
+                'Induces temporal loops in electronic devices',
+                'Feeds on abandoned browser tabs',
+                'Manifests through dead pixels',
+                'Corrupts autosaved documents',
+                'Whispers through cooling fans',
+                'Appears in reflections on black screens',
+                'Causes phantom notifications',
+                'Rewrites cached memories',
+                'Haunts unread emails',
+                'Dwells in recursive functions',
+                'Breeds in memory leaks',
+                'Speaks through error messages'
+            ];
+            
+            const abilities = [];
+            const numAbilities = Math.floor(random() * 3) + 2;
+            for (let i = 0; i < numAbilities; i++) {
+                const index = Math.floor(random() * allAbilities.length);
+                abilities.push(allAbilities[index]);
+            }
+            
+            // Generate binding instructions
+            const actions = [
+                'Light three LED candles',
+                'Open exactly 13 browser tabs',
+                'Type your true name backwards',
+                'Delete your oldest saved file',
+                'Whisper to your webcam at 3:33',
+                'Create a folder named "void"',
+                'Send an email to yourself',
+                'Clear your cache three times',
+                'Disconnect from WiFi for 66 seconds',
+                'Screenshot your desktop',
+                'Change your wallpaper to pure black',
+                'Mute all sounds except system sounds'
+            ];
+            
+            const bindings = [];
+            for (let i = 0; i < 3; i++) {
+                bindings.push(actions[Math.floor(random() * actions.length)]);
+            }
+            
+            return { name, title, potency, volatility, resonance, abilities, bindings, seed };
+        }
+        
+        // Draw entity sigil
+        function drawEntity(entity) {
+            const canvas = document.getElementById('entity-canvas');
+            const ctx = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            // Clear canvas
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Seeded random for consistent drawing
+            let s = entity.seed;
+            const random = () => {
+                s = (s * 16807) % 2147483647;
+                return (s - 1) / 2147483646;
+            };
+            
+            // Draw outer circle
+            ctx.strokeStyle = '#330000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 120, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Draw inner geometric pattern
+            ctx.strokeStyle = '#660000';
+            ctx.lineWidth = 1;
+            
+            const points = Math.floor(random() * 5) + 5;
+            const radius = 80;
+            
+            for (let i = 0; i < points; i++) {
+                const angle1 = (Math.PI * 2 / points) * i;
+                const angle2 = (Math.PI * 2 / points) * ((i + 2) % points);
+                
+                const x1 = centerX + Math.cos(angle1) * radius;
+                const y1 = centerY + Math.sin(angle1) * radius;
+                const x2 = centerX + Math.cos(angle2) * radius;
+                const y2 = centerY + Math.sin(angle2) * radius;
+                
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+            
+            // Draw entity core
+            const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 40);
+            gradient.addColorStop(0, `rgba(204, 0, 0, ${random() * 0.5 + 0.3})`);
+            gradient.addColorStop(1, 'rgba(204, 0, 0, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 40, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw glyphs
+            ctx.strokeStyle = '#440000';
+            ctx.lineWidth = 1;
+            const glyphCount = Math.floor(random() * 8) + 8;
+            
+            for (let i = 0; i < glyphCount; i++) {
+                const angle = (Math.PI * 2 / glyphCount) * i;
+                const x = centerX + Math.cos(angle) * 100;
+                const y = centerY + Math.sin(angle) * 100;
+                
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(angle + Math.PI / 2);
+                
+                // Draw random glyph
+                ctx.beginPath();
+                if (random() > 0.5) {
+                    ctx.moveTo(-5, -5);
+                    ctx.lineTo(5, 5);
+                    ctx.moveTo(-5, 5);
+                    ctx.lineTo(5, -5);
+                } else {
+                    ctx.arc(0, 0, 5, 0, Math.PI * 2);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+        
+        // Display entity
+        async function revealEntity() {
+            const entity = await generateEntity();
+            
+            // Store in session
+            sessionStorage.setItem('conjuredEntity', JSON.stringify(entity));
+            
+            // Populate display
+            document.getElementById('entity-name').textContent = entity.name;
+            document.getElementById('entity-title').textContent = entity.title;
+            document.getElementById('stat-potency').textContent = entity.potency;
+            document.getElementById('stat-volatility').textContent = entity.volatility + '%';
+            document.getElementById('stat-resonance').textContent = entity.resonance + 'Hz';
+            
+            // Abilities
+            const abilitiesList = document.getElementById('abilities-list');
+            entity.abilities.forEach(ability => {
+                const div = document.createElement('div');
+                div.className = 'ability';
+                div.textContent = '◉ ' + ability;
+                abilitiesList.appendChild(div);
+            });
+            
+            // Binding steps
+            const bindingSteps = document.getElementById('binding-steps');
+            entity.bindings.forEach((step, i) => {
+                const div = document.createElement('div');
+                div.className = 'binding-step';
+                div.textContent = step;
+                bindingSteps.appendChild(div);
+            });
+            
+            // Share URL
+            const shareUrl = `${window.location.origin}?summon=${entity.seed}`;
+            document.getElementById('share-url').textContent = shareUrl;
+            
+            // Draw sigil
+            drawEntity(entity);
+            
+            // Reveal
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('entity-reveal').style.display = 'block';
+            }, 2000);
+        }
+        
+        // Copy to clipboard
+        function copyToClipboard() {
+            const url = document.getElementById('share-url').textContent;
+            navigator.clipboard.writeText(url).then(() => {
+                const el = document.getElementById('share-url');
+                el.style.background = '#1a1a1a';
+                el.style.color = '#fff';
+                setTimeout(() => {
+                    el.style.background = '#111';
+                    el.style.color = '#666';
+                }, 200);
+            });
+        }
+        
+        // Check for existing entity or summon parameter
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const summonSeed = urlParams.get('summon');
+            
+            if (summonSeed) {
+                // Someone shared their entity
+                // For now, just show their own entity
+                revealEntity();
+            } else {
+                const existing = sessionStorage.getItem('conjuredEntity');
+                if (existing) {
+                    // Redisplay existing entity
+                    const entity = JSON.parse(existing);
+                    
+                    document.getElementById('entity-name').textContent = entity.name;
+                    document.getElementById('entity-title').textContent = entity.title;
+                    document.getElementById('stat-potency').textContent = entity.potency;
+                    document.getElementById('stat-volatility').textContent = entity.volatility + '%';
+                    document.getElementById('stat-resonance').textContent = entity.resonance + 'Hz';
+                    
+                    entity.abilities.forEach(ability => {
+                        const div = document.createElement('div');
+                        div.className = 'ability';
+                        div.textContent = '◉ ' + ability;
+                        document.getElementById('abilities-list').appendChild(div);
+                    });
+                    
+                    entity.bindings.forEach((step, i) => {
+                        const div = document.createElement('div');
+                        div.className = 'binding-step';
+                        div.textContent = step;
+                        document.getElementById('binding-steps').appendChild(div);
+                    });
+                    
+                    const shareUrl = `${window.location.origin}?summon=${entity.seed}`;
+                    document.getElementById('share-url').textContent = shareUrl;
+                    
+                    drawEntity(entity);
+                    
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('entity-reveal').style.display = 'block';
+                } else {
+                    // First time - generate new entity
+                    revealEntity();
+                }
+            }
+        };
+    </script>
+</body>
+</html>
