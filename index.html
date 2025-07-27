@@ -208,10 +208,18 @@
             letter-spacing: 2px;
         }
         
-        #summon-btn:hover {
-            background: rgba(204, 0, 0, 0.1);
-            border-color: #cc0000;
-            box-shadow: 0 0 20px rgba(204, 0, 0, 0.3);
+        .viewing-other {
+            border-color: #003366 !important;
+            box-shadow: 0 0 30px rgba(0, 100, 200, 0.2) !important;
+        }
+        
+        .other-entity-notice {
+            background: rgba(0, 50, 100, 0.1);
+            border: 1px solid #003366;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 14px;
+            color: #88aacc;
         }
     </style>
 </head>
@@ -305,9 +313,9 @@
             return Math.abs(hash);
         }
         
-        // Generate entity based on fingerprint
-        async function generateEntity() {
-            const fingerprint = await generateFingerprint();
+        // Generate entity based on fingerprint or provided seed
+        async function generateEntity(providedSeed = null) {
+            const fingerprint = providedSeed || await generateFingerprint();
             const seed = fingerprint;
             
             // Seeded random number generator
@@ -481,11 +489,13 @@
         }
         
         // Display entity
-        async function revealEntity() {
-            const entity = await generateEntity();
+        async function revealEntity(seedOverride = null) {
+            const entity = await generateEntity(seedOverride);
             
-            // Store in session
-            sessionStorage.setItem('conjuredEntity', JSON.stringify(entity));
+            // Store in session only if it's the user's own entity
+            if (!seedOverride) {
+                sessionStorage.setItem('conjuredEntity', JSON.stringify(entity));
+            }
             
             // Populate display
             document.getElementById('entity-name').textContent = entity.name;
@@ -546,9 +556,24 @@
             const summonSeed = urlParams.get('summon');
             
             if (summonSeed) {
-                // Someone shared their entity
-                // For now, just show their own entity
-                revealEntity();
+                // Someone shared their entity - show it with special message
+                revealEntity(parseInt(summonSeed));
+                
+                // Add viewing notice and visual changes
+                setTimeout(() => {
+                    const warning = document.querySelector('.warning');
+                    warning.innerHTML = 'You are viewing another\'s bound entity.<br>Return to <a href="/" style="color: #666;">conjur.in</a> to discover your own.';
+                    
+                    // Add visual indicator
+                    document.getElementById('entity-canvas').classList.add('viewing-other');
+                    
+                    // Add notice before share section
+                    const shareSection = document.querySelector('.share-section');
+                    const notice = document.createElement('div');
+                    notice.className = 'other-entity-notice';
+                    notice.innerHTML = '⚠ This entity is bound to another soul. You cannot command it.';
+                    shareSection.parentNode.insertBefore(notice, shareSection);
+                }, 2100);
             } else {
                 const existing = sessionStorage.getItem('conjuredEntity');
                 if (existing) {
