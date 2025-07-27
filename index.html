@@ -11,6 +11,10 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+        } /* <-- Add this closing brace */
+
+        #summon-btn:active {
+            transform: scale(0.98);
         }
         
         body {
@@ -58,6 +62,20 @@
         @keyframes pulse {
             0%, 100% { box-shadow: 0 0 30px rgba(255, 0, 0, 0.1); }
             50% { box-shadow: 0 0 50px rgba(255, 0, 0, 0.3); }
+        }
+        
+        .entity-speaking {
+            animation: pulse 2s ease-in-out infinite !important;
+            box-shadow: 0 0 60px rgba(255, 0, 0, 0.5) !important;
+        }
+        
+        .speaking .entity-name {
+            animation: shimmer 3s ease-in-out infinite;
+        }
+        
+        @keyframes shimmer {
+            0%, 100% { text-shadow: 0 0 10px rgba(255, 255, 255, 0.3); }
+            50% { text-shadow: 0 0 20px rgba(255, 100, 100, 0.8); }
         }
         
         .entity-name {
@@ -206,6 +224,7 @@
             transition: all 0.3s;
             margin-top: 40px;
             letter-spacing: 2px;
+            text-transform: lowercase;
         }
         
         .viewing-other {
@@ -276,10 +295,271 @@
                 Warning: Each browser soul may only bind one entity. 
                 Clear your spiritual cache to summon anew.
             </p>
+            
+            <button id="summon-btn" onclick="playEntitySound()" title="Each entity speaks with its own voice">hear its voice</button>
         </div>
     </div>
 
     <script>
+        // Global audio context
+        let audioContext;
+        let currentEntity;
+        let analyser;
+        let animationId;
+        
+        // Entity sound generator
+        function playEntitySound() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            const btn = document.getElementById('summon-btn');
+            
+            if (btn.textContent === 'hear its voice') {
+                // Get entity stats
+                const resonance = parseInt(document.getElementById('stat-resonance').textContent);
+                const potency = parseInt(document.getElementById('stat-potency').textContent);
+                const volatility = parseInt(document.getElementById('stat-volatility').textContent);
+                
+                // Create the entity's voice
+                createEntityVoice(resonance, potency, volatility);
+                btn.textContent = 'silence';
+                
+                // Add visual feedback
+                document.getElementById('entity-canvas').classList.add('entity-speaking');
+                document.getElementById('entity-reveal').classList.add('speaking');
+                
+                // Start audio visualization
+                if (analyser) {
+                    visualizeAudio();
+                }
+            } else {
+                // Stop all sounds
+                if (window.activeOscillators) {
+                    window.activeOscillators.forEach(osc => {
+                        try { osc.stop(); } catch(e) {}
+                    });
+                    window.activeOscillators = [];
+                }
+                if (audioContext.state === 'running') {
+                    audioContext.suspend();
+                }
+                btn.textContent = 'hear its voice';
+                
+                // Remove visual feedback
+                document.getElementById('entity-canvas').classList.remove('entity-speaking');
+                document.getElementById('entity-reveal').classList.remove('speaking');
+                
+                // Stop visualization
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                    animationId = null;
+                    // Redraw static sigil
+                    drawEntity(currentEntity);
+                }
+            }
+        }
+        
+        function createEntityVoice(resonance, potency, volatility) {
+            // Resume context if suspended
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            
+            // Base frequency from resonance (map to audible range)
+            const baseFreq = (resonance / 1000) * 400 + 80; // 80-480 Hz range
+            
+            // Volume from potency (map to 0-0.15 range for safety)
+            const volume = (potency / 1000) * 0.15;
+            
+            // Create master gain
+            const masterGain = audioContext.createGain();
+            masterGain.gain.value = volume;
+            
+            // Create analyser for visualization
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            masterGain.connect(analyser);
+            analyser.connect(audioContext.destination);
+            
+            // Create multiple oscillators for rich texture
+            for (let i = 0; i < 3; i++) {
+                const osc = audioContext.createOscillator();
+                const oscGain = audioContext.createGain();
+                const filter = audioContext.createBiquadFilter();
+                
+                // Slightly detune oscillators for richness
+                osc.frequency.value = baseFreq * (1 + i * 0.01);
+                osc.type = i === 0 ? 'sine' : (i === 1 ? 'triangle' : 'sawtooth');
+                
+                // Individual oscillator volume
+                oscGain.gain.value = i === 0 ? 0.4 : 0.2;
+                
+                // Filter setup
+                filter.type = 'lowpass';
+                filter.frequency.value = baseFreq * 4;
+                filter.Q.value = 5 + (volatility / 10);
+                
+                // Connect chain
+                osc.connect(filter);
+                filter.connect(oscGain);
+                
+                // Add distortion based on volatility
+                if (volatility > 30) {
+                    const distortion = audioContext.createWaveShaper();
+                    distortion.curve = makeDistortionCurve(volatility);
+                    distortion.oversample = '4x';
+                    oscGain.connect(distortion);
+                    distortion.connect(masterGain);
+                } else {
+                    oscGain.connect(masterGain);
+                }
+                
+                // Start oscillator
+                osc.start();
+                
+                // Modulation based on volatility
+                if (volatility > 50) {
+                    const lfo = audioContext.createOscillator();
+                    const lfoGain = audioContext.createGain();
+                    
+                    lfo.frequency.value = volatility / 20; // 2.5-5 Hz
+                    lfoGain.gain.value = volatility * 0.5; // Subtle frequency modulation
+                    
+                    lfo.connect(lfoGain);
+                    lfoGain.connect(osc.frequency);
+                    lfo.start();
+                    
+                    // Store LFO for cleanup
+                    window.activeOscillators.push(lfo);
+                }
+                
+                // Store for cleanup
+                if (!window.activeOscillators) window.activeOscillators = [];
+                window.activeOscillators.push(osc);
+            }
+            
+            // Add reverb for ethereal quality
+            createReverb(masterGain, volatility);
+            
+            // Fade in
+            masterGain.gain.setValueAtTime(0, audioContext.currentTime);
+            masterGain.gain.linearRampToValueAtTime(volume, audioContext.currentTime + 1);
+        }
+        
+        function makeDistortionCurve(amount) {
+            const samples = 44100;
+            const curve = new Float32Array(samples);
+            
+            for (let i = 0; i < samples; i++) {
+                const x = (i * 2) / samples - 1;
+                curve[i] = Math.tanh(x * (amount / 20));
+            }
+            
+            return curve;
+        }
+        
+        function createReverb(source, volatility) {
+            const convolver = audioContext.createConvolver();
+            const length = audioContext.sampleRate * 2;
+            const impulse = audioContext.createBuffer(2, length, audioContext.sampleRate);
+            
+            for (let channel = 0; channel < 2; channel++) {
+                const channelData = impulse.getChannelData(channel);
+                for (let i = 0; i < length; i++) {
+                    channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2 + volatility / 50);
+                }
+            }
+            
+            convolver.buffer = impulse;
+            
+            const reverbGain = audioContext.createGain();
+            reverbGain.gain.value = 0.1 + (volatility / 200);
+            
+            const reverbSend = audioContext.createGain();
+            reverbSend.gain.value = 0.3;
+            
+            source.connect(reverbSend);
+            reverbSend.connect(convolver);
+            convolver.connect(reverbGain);
+            reverbGain.connect(analyser);
+        }
+        
+        // Audio visualization
+        function visualizeAudio() {
+            if (!analyser || audioContext.state !== 'running') return;
+            
+            const canvas = document.getElementById('entity-canvas');
+            const ctx = canvas.getContext('2d');
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            
+            function draw() {
+                animationId = requestAnimationFrame(draw);
+                analyser.getByteFrequencyData(dataArray);
+                
+                // Clear canvas with fade effect
+                ctx.fillStyle = 'rgba(10, 10, 10, 0.1)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Redraw base sigil with audio-reactive modifications
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                
+                // Get average frequency amplitude
+                let sum = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    sum += dataArray[i];
+                }
+                const average = sum / bufferLength;
+                const scale = 1 + (average / 255) * 0.3;
+                
+                // Draw pulsing outer circle
+                ctx.strokeStyle = `rgba(204, 0, 0, ${0.3 + average / 500})`;
+                ctx.lineWidth = 2 + average / 50;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, 120 * scale, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // Draw frequency bars as rays
+                ctx.strokeStyle = `rgba(102, 0, 0, 0.8)`;
+                for (let i = 0; i < bufferLength; i += 4) {
+                    const angle = (i / bufferLength) * Math.PI * 2;
+                    const barHeight = (dataArray[i] / 255) * 50;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        centerX + Math.cos(angle) * 80,
+                        centerY + Math.sin(angle) * 80
+                    );
+                    ctx.lineTo(
+                        centerX + Math.cos(angle) * (80 + barHeight),
+                        centerY + Math.sin(angle) * (80 + barHeight)
+                    );
+                    ctx.stroke();
+                }
+                
+                // Redraw entity core with glow
+                const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 40 * scale);
+                gradient.addColorStop(0, `rgba(204, 0, 0, ${0.5 + average / 300})`);
+                gradient.addColorStop(1, 'rgba(204, 0, 0, 0)');
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, 40 * scale, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            draw();
+        }
+        
+        // Stop sounds when navigating away
+        window.addEventListener('beforeunload', () => {
+            if (audioContext && audioContext.state === 'running') {
+                audioContext.close();
+            }
+        });
+        
         // Generate browser fingerprint
         async function generateFingerprint() {
             const canvas = document.createElement('canvas');
@@ -491,6 +771,7 @@
         // Display entity
         async function revealEntity(seedOverride = null) {
             const entity = await generateEntity(seedOverride);
+            currentEntity = entity;
             
             // Store in session only if it's the user's own entity
             if (!seedOverride) {
@@ -505,16 +786,17 @@
             document.getElementById('stat-resonance').textContent = entity.resonance + 'Hz';
             
             // Abilities
-            const abilitiesList = document.getElementById('abilities-list');
+            document.getElementById('abilities-list').innerHTML = '';
             entity.abilities.forEach(ability => {
                 const div = document.createElement('div');
                 div.className = 'ability';
                 div.textContent = '◉ ' + ability;
-                abilitiesList.appendChild(div);
+                document.getElementById('abilities-list').appendChild(div);
             });
             
             // Binding steps
             const bindingSteps = document.getElementById('binding-steps');
+            bindingSteps.innerHTML = ''; // Clear previous
             entity.bindings.forEach((step, i) => {
                 const div = document.createElement('div');
                 div.className = 'binding-step';
@@ -579,6 +861,7 @@
                 if (existing) {
                     // Redisplay existing entity
                     const entity = JSON.parse(existing);
+                    currentEntity = entity;
                     
                     document.getElementById('entity-name').textContent = entity.name;
                     document.getElementById('entity-title').textContent = entity.title;
@@ -586,6 +869,7 @@
                     document.getElementById('stat-volatility').textContent = entity.volatility + '%';
                     document.getElementById('stat-resonance').textContent = entity.resonance + 'Hz';
                     
+                    document.getElementById('abilities-list').innerHTML = '';
                     entity.abilities.forEach(ability => {
                         const div = document.createElement('div');
                         div.className = 'ability';
@@ -593,11 +877,13 @@
                         document.getElementById('abilities-list').appendChild(div);
                     });
                     
+                    const bindingSteps = document.getElementById('binding-steps');
+                    bindingSteps.innerHTML = ''; // Clear previous
                     entity.bindings.forEach((step, i) => {
                         const div = document.createElement('div');
                         div.className = 'binding-step';
                         div.textContent = step;
-                        document.getElementById('binding-steps').appendChild(div);
+                        bindingSteps.appendChild(div);
                     });
                     
                     const shareUrl = `${window.location.origin}?summon=${entity.seed}`;
